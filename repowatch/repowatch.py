@@ -195,13 +195,13 @@ class RepoWatch:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('RepoWatch')
         self.logger.setLevel(logging.INFO)
-        if args.debug:
+        if self.args.debug:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
         self.syslog = logging.handlers.SysLogHandler("/dev/log")
         self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
-        if args.pidfile:
+        if self.args.pidfile:
             self.logger.addHandler(self.syslog)
 
         # Config
@@ -211,7 +211,12 @@ class RepoWatch:
 
         # read project config to determine what threads we need to start
         self.projects = {}
-        for p in yaml.safe_load(open(args.projects)):
+        try:
+            project_yaml = open(self.args.projects)
+        except IOError:
+            self.logger.error('Could not find project yaml file at: {0}'.format(self.args.projects))
+            raise Exception
+        for p in yaml.safe_load(project_yaml):
             self.projects[p['project']] = p
             if p['type'] in needed:
                 needed[p['type']] = True
@@ -223,7 +228,12 @@ class RepoWatch:
         config = ConfigParser.ConfigParser()
         self.options = dict()
         self.threads = dict()
-        config.read(args.config)
+        try:
+            config_ini = open(self.args.config)
+        except IOError:
+            self.logger.error('Could not find config file at: {0}'.format(self.args.config))
+            raise Exception
+        config.readfp(config_ini)
 
         get_class = lambda x: globals()[x]
 
@@ -404,7 +414,7 @@ class RepoWatch:
     def run(self):
         """Run."""
 
-        if args.pidfile:
+        if self.args.pidfile:
             pidfile = daemon.pidlockfile.TimeoutPIDLockFile(self.args.pidfile, acquire_timeout=2)
             context = daemon.DaemonContext(pidfile=pidfile)
             # because of https://github.com/paramiko/paramiko/issues/59
@@ -413,9 +423,9 @@ class RepoWatch:
             context = FakeContext()
 
         try:
-            watcher.setup()
+            self.setup()
 
-            if args.pidfile:
+            if self.args.pidfile:
                 # try and see if we can since it seems that the context doesn't throw a exception
                 pidfile.acquire()
                 pidfile.release()
@@ -426,7 +436,7 @@ class RepoWatch:
             with context:
                 self._initial_checkout()
 
-                for name, thread in watcher.threads.items():
+                for name, thread in self.threads.items():
                     thread.start()
                 self.main_loop()
         except lockfile.LockTimeout:
@@ -434,8 +444,11 @@ class RepoWatch:
                               'are we already running?')
         finally:
             self.logger.info('Shutting down')
-            self.cleanup_ssh_wrapper(self.wrapper)
-            for name, thread in watcher.threads.items():
+            try:
+                self.cleanup_ssh_wrapper(self.wrapper)
+            except:
+                self.logger.info('No SSH wrapper to clean?')
+            for name, thread in self.threads.items():
                 thread.join(2)
             sys.exit(0)
 
@@ -449,9 +462,8 @@ def main():
                         help='Path to pidfile')
     parser.add_argument('--debug', dest='debug', action='store_true', default=False,
                         help='Debug mode')
-    args = parser.parse_args()
 
-    watcher = RepoWatch(args)
+    watcher = RepoWatch(parser.parse_args())
     watcher.run()
 
 if __name__ == '__main__':
