@@ -439,7 +439,7 @@ class RepoWatch:
                 thread.join(2)
             sys.exit(0)
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='Watch Gerrit/GitLab and checkout branches')
     parser.add_argument('-C', dest='config', action='store',
                         help='Path to repowatch.conf file', required=True)
@@ -453,3 +453,6 @@ if __name__ == '__main__':
 
     watcher = RepoWatch(args)
     watcher.run()
+
+if __name__ == '__main__':
+    main()
