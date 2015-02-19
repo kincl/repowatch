@@ -1,0 +1,11 @@
+from setuptools import setup
+
+setup(name='repowatch',
+      version='1.0',
+      description='Watches Gerrit and GitLab and checks out git repo updates',
+      url='https://github.com/kincl/repowatch',
+      author='Jason Kincl',
+      author_email='jkincl@gmail.gov',
+      license='MIT',
+      packages=['repowatch'],
+      entry_points= { 'console_scripts': ['repowatch=repowatch.repowatch:main'] })
