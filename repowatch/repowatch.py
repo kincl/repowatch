@@ -33,6 +33,8 @@ import lockfile
 import tempfile
 import stat
 
+import paramiko
+
 GIT_SSH_WRAPPER = '''#!/bin/sh
 
 if [ -z "$PKEY" ]; then
@@ -47,18 +49,12 @@ class WatchGerrit(threading.Thread):
     """ Threaded job; listens for Gerrit events and puts them in a queue """
 
     def __init__(self, options, queue):
-        import paramiko
-
         options['port'] = int(options['port']) # convert to int?
         if 'timeout' not in options:
             options['timeout'] = 60
         self.options = options
         self.queue = queue
         self.logger = logging.getLogger('RepoWatch.WatchGerrit')
-
-        self.client = paramiko.SSHClient()
-        self.client.load_system_host_keys()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         threading.Thread.__init__(self)
 
     def get_extra(self, project):
@@ -69,8 +65,11 @@ class WatchGerrit(threading.Thread):
         """
         extra_refs = []
         try:
-            self.client.connect(**self.options)
-            _, stdout, _ = self.client.exec_command('gerrit query "status:open project:{0}" --patch-sets --format json'.format(project))
+            client = paramiko.SSHClient()
+            client.load_system_host_keys()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(**self.options)
+            _, stdout, _ = client.exec_command('gerrit query "status:open project:{0}" --patch-sets --format json'.format(project))
             for line in stdout:
                 # get
                 data = json.loads(line)
@@ -78,9 +77,9 @@ class WatchGerrit(threading.Thread):
                     extra_refs.append([data['patchSets'][-1:][0]['ref'], 'change_{0}'.format(data['number'])])
 
         except Exception, e:
-            logging.exception('get_extra error: {0}'.format(str(e)))
+            self.logger.exception('get_extra error: {0}'.format(str(e)))
         finally:
-            self.client.close()
+            client.close()
 
         self.logger.debug('Adding extra Gerrit refs: {0}'.format(extra_refs))
         return extra_refs
@@ -89,16 +88,19 @@ class WatchGerrit(threading.Thread):
         while 1:
 
             try:
-                self.client.connect(**self.options)
-                self.client.get_transport().set_keepalive(60)
-                _, stdout, _ = self.client.exec_command('gerrit stream-events')
+                client = paramiko.SSHClient()
+                client.load_system_host_keys()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(**self.options)
+                client.get_transport().set_keepalive(60)
+                _, stdout, _ = client.exec_command('gerrit stream-events')
                 for line in stdout:
                     #self.queue.put(json.loads(line))
                     self.handle_event(json.loads(line))
             except Exception, e:
                 logging.exception('WatchGerrit: error: {0}'.format(str(e)))
             finally:
-                self.client.close()
+                client.close()
             time.sleep(5)
 
     def handle_event(self, event):
