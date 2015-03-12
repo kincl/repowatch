@@ -47,32 +47,58 @@ class WatchGerrit(threading.Thread):
     """ Threaded job; listens for Gerrit events and puts them in a queue """
 
     def __init__(self, options, queue):
+        import paramiko
+
         options['port'] = int(options['port']) # convert to int?
         if 'timeout' not in options:
             options['timeout'] = 60
         self.options = options
         self.queue = queue
         self.logger = logging.getLogger('RepoWatch.WatchGerrit')
+
+        self.client = paramiko.SSHClient()
+        self.client.load_system_host_keys()
+        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         threading.Thread.__init__(self)
 
-    def run(self):
-        import paramiko
+    def get_extra(self, project):
+        """ Fetch list of extra refs to check out.
 
+            returns tuple (ref, change_$number)
+
+        """
+        extra_refs = []
+        try:
+            self.client.connect(**self.options)
+            _, stdout, _ = self.client.exec_command('gerrit query "status:open project:{0}" --patch-sets --format json'.format(project))
+            for line in stdout:
+                # get
+                data = json.loads(line)
+                if data.get('status', None):
+                    extra_refs.append([data['patchSets'][-1:][0]['ref'], 'change_{0}'.format(data['number'])])
+
+        except Exception, e:
+            logging.exception('get_extra error: {0}'.format(str(e)))
+        finally:
+            self.client.close()
+
+        self.logger.debug('Adding extra Gerrit refs: {0}'.format(extra_refs))
+        return extra_refs
+
+    def run(self):
         while 1:
-            client = paramiko.SSHClient()
-            client.load_system_host_keys()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
             try:
-                client.connect(**self.options)
-                client.get_transport().set_keepalive(60)
-                _, stdout, _ = client.exec_command('gerrit stream-events')
+                self.client.connect(**self.options)
+                self.client.get_transport().set_keepalive(60)
+                _, stdout, _ = self.client.exec_command('gerrit stream-events')
                 for line in stdout:
                     #self.queue.put(json.loads(line))
                     self.handle_event(json.loads(line))
             except Exception, e:
                 logging.exception('WatchGerrit: error: {0}'.format(str(e)))
             finally:
-                client.close()
+                self.client.close()
             time.sleep(5)
 
     def handle_event(self, event):
@@ -167,6 +193,10 @@ class WatchGitlab(threading.Thread):
         self.logger = logging.getLogger('RepoWatch.WatchGitlab')
         threading.Thread.__init__(self)
 
+    def get_extra(self, project):
+        """ Get open issues? """
+        return []
+
     def run(self):
         port = 8000
         httpd = GitlabHTTPServer(('', port), GitlabHTTPHandler, self.queue)
@@ -195,12 +225,14 @@ class RepoWatch:
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('RepoWatch')
         self.logger.setLevel(logging.INFO)
+
         if self.args.debug:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
-        self.syslog = logging.handlers.SysLogHandler("/dev/log")
-        self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
+            self.syslog = logging.handlers.SysLogHandler("/dev/log")
+            self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
+
         if self.args.pidfile:
             self.logger.addHandler(self.syslog)
 
@@ -211,6 +243,7 @@ class RepoWatch:
 
         # read project config to determine what threads we need to start
         self.projects = {}
+
         try:
             project_yaml = open(self.args.projects)
         except IOError:
@@ -248,7 +281,10 @@ class RepoWatch:
 
                 self.options[repo] = _options
                 modu = get_class('Watch{0}'.format(repo.capitalize()))
-                self.threads[repo] = modu(_options, self.queue)
+                try:
+                    self.threads[repo] = modu(_options, self.queue)
+                except Exception as e:
+                    self.logger.info('Error instantiating watcher: {0}'.format(e))
                 self.threads[repo].daemon = True
 
         self.logger.info('Finished config')
@@ -310,6 +346,9 @@ class RepoWatch:
             if remote:
                 for branch in [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]:
                     self.update_branch(project, branch)
+                # check out extra branches like issues or changesets
+                for ref, outdir in self.threads[data['type']].get_extra(project):
+                    self.update_branch(project, ref, outdir)
             else:
                 self.logger.warn('Did not find remote heads for {0}'.format(project))
 
