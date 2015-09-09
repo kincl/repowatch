@@ -320,17 +320,17 @@ class RepoWatch:
 
         p = subprocess.Popen(cmd.split(),
                              stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE,
+                             stderr=subprocess.STDOUT,
                              env=env_dict,
                              **kwargs)
         out, err = p.communicate()
+        out = out.strip()
         if p.returncode != 0:
-            self.logger.error("Nonzero return code\n" \
-                              "Code: {0} Exec: {1}\n" \
-                              "Output: {2} Error: {3}".format(p.returncode,
-                                                               cmd,
-                                                               repr(out),
-                                                               repr(err)))
+            self.logger.error("Nonzero return code. "\
+                              "Code {0}, Exec: {1}, "\
+                              "Output: {2}".format(p.returncode,
+                                                    repr(cmd), 
+                                                    repr(out)))
         else:
             return out
 
