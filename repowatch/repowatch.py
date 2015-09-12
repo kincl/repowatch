@@ -503,9 +503,9 @@ class RepoWatch:
                 for name, thread in self.threads.items():
                     thread.start()
                 self.main_loop()
-        except pidlockfile.LockTimeout:
-            logging.exception('Lockfile timeout while attempting to acquire lock, '
-                              'are we already running?')
+        except lockfile.LockTimeout:
+            logging.error('Lockfile timeout while attempting to acquire lock, '
+                          'are we already running?')
         finally:
             self.logger.info('Shutting down')
             try:
@@ -513,7 +513,8 @@ class RepoWatch:
             except:
                 self.logger.info('No SSH wrapper to clean?')
             for name, thread in self.threads.items():
-                thread.join(2)
+                if thread.is_alive():
+                    thread.join(2)
             sys.exit(0)
 
 def main():
