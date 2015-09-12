@@ -390,12 +390,12 @@ class RepoWatch:
         self.run_cmd('find {0} ' \
                      '-type f ' \
                      '-not -path *.git* ' \
-                     '-exec chmod 644 {{}} ;'.format(dirname(fullpath)))
+                     '-exec chmod 644 {{}} ;'.format(fullpath))
 
         self.run_cmd('find {0} ' \
                      '-type d ' \
                      '-not -path *.git* ' \
-                     '-exec chmod 755 {{}} ;'.format(dirname(fullpath)))
+                     '-exec chmod 755 {{}} ;'.format(fullpath))
 
 
     def delete_branch(self, project_name, branch_name):
