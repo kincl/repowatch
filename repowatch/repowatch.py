@@ -369,7 +369,10 @@ class RepoWatch:
 
         self.logger.info('Update repo branch: {0}:{1} in {2}'.format(project_name, branch_name, fullpath))
 
-        if not os.path.isdir(fullpath):
+        if os.path.isdir(fullpath):
+            if not os.path.isdir(os.path.join(fullpath, '.git')):
+                self.run_cmd('git init', cwd=fullpath)
+        else:
             # create branch dir
             os.makedirs(fullpath)
             self.run_cmd('git init', cwd=fullpath)
