@@ -1,0 +1,12 @@
+[Unit]
+Description=Repowatch Daemon
+# Repowatch will be started after networking is online
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/repowatch
+ExecStart=/usr/bin/repowatch -C "${CONFIG}" -P "${PROJECTS}"
+
+[Install]
+WantedBy=multi-user.target
