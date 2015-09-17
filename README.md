@@ -33,11 +33,15 @@ projects.yaml:
 - project: test-project
   type: gerrit
   path: /tmp/test-project-2
+  cmds:
+    - echo "%{branch} %{branchdir}"
+    - echo "%{project} %{projectdir}"
 - project: testuser/test-project
   type: gitlab
   path: /tmp/test-project
 ```
 
+User specified commands run after checkout.
 
 TODO
 ----

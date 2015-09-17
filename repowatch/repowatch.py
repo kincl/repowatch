@@ -334,6 +334,26 @@ class RepoWatch:
         else:
             return out
 
+    def run_user_cmd(self, cmds, project_name, branch_name):
+        # user may pass a singe command
+        if isinstance(cmds, str):
+            cmds = [cmds]
+
+        project_dir = self.projects[project_name]['path']
+        varmap = {
+          '%{branch}': branch_name,
+          '%{project}': project_name,
+          '%{branchdir}':  os.path.join(project_dir, branch_name),
+          '%{projectdir}': project_dir
+        }
+
+        # replace variables with real values
+        cmds = [ reduce(lambda x, y: x.replace(y, varmap[y]), varmap, s) for s in cmds ]
+
+        # run commands
+        for command in cmds:
+            self.run_cmd(command)
+
     def _initial_checkout(self):
         """ Look at all branches and check them out """
         self.logger.info('Doing initial checkout of branches')
@@ -367,6 +387,11 @@ class RepoWatch:
         fullpath = self.projects[project_name]['path']+'/'+output_dir
         project_type = self.projects[project_name]['type']
 
+        try:
+            cmds = self.projects[project_name]['cmds']
+        except KeyError:
+            cmds = None
+
         self.logger.info('Update repo branch: {0}:{1} in {2}'.format(project_name, branch_name, fullpath))
 
         if not os.path.isdir(fullpath):
@@ -386,17 +411,9 @@ class RepoWatch:
         self.run_cmd('git checkout -f FETCH_HEAD ',
                      cwd=fullpath)
 
-        # set perms
-        self.run_cmd('find {0} ' \
-                     '-type f ' \
-                     '-not -path *.git* ' \
-                     '-exec chmod 644 {{}} ;'.format(dirname(fullpath)))
-
-        self.run_cmd('find {0} ' \
-                     '-type d ' \
-                     '-not -path *.git* ' \
-                     '-exec chmod 755 {{}} ;'.format(dirname(fullpath)))
-
+        # run user defined commands
+        if cmds:
+            self.run_user_cmd(cmds, project_name, output_dir)
 
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
