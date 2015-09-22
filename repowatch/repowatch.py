@@ -338,10 +338,7 @@ class RepoWatch:
             return out
 
     def run_user_cmd(self, cmds, project_name, branch_name):
-        # user may pass a singe command
-        if isinstance(cmds, str):
-            cmds = [cmds]
-
+        """ Allows specifying of commands in config for project to run after project is created or updated """
         project_dir = self.projects[project_name]['path']
         varmap = {
           '%{branch}': branch_name,
