@@ -27,8 +27,11 @@ import cgi
 from contextlib import contextmanager
 
 import daemon
-import daemon.pidlockfile
 import lockfile
+try:
+    from lockfile import pidlockfile
+except ImportError:
+    from daemon import pidlockfile
 
 import tempfile
 import stat
@@ -456,7 +459,7 @@ class RepoWatch:
         """Run."""
 
         if self.args.pidfile:
-            pidfile = daemon.pidlockfile.TimeoutPIDLockFile(self.args.pidfile, acquire_timeout=2)
+            pidfile = pidlockfile.PIDLockFile(self.args.pidfile)
             context = daemon.DaemonContext(pidfile=pidfile)
             # because of https://github.com/paramiko/paramiko/issues/59
             context.files_preserve = self.files_preserve_by_path('/dev/urandom')
@@ -468,7 +471,7 @@ class RepoWatch:
 
             if self.args.pidfile:
                 # try and see if we can since it seems that the context doesn't throw a exception
-                pidfile.acquire()
+                pidfile.acquire(timeout=2)
                 pidfile.release()
                 self.logger.info('Attempting to daemonize')
             else:
@@ -480,7 +483,7 @@ class RepoWatch:
                 for name, thread in self.threads.items():
                     thread.start()
                 self.main_loop()
-        except lockfile.LockTimeout:
+        except pidlockfile.LockTimeout:
             logging.exception('Lockfile timeout while attempting to acquire lock, '
                               'are we already running?')
         finally:
