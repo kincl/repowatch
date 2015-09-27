@@ -317,7 +317,9 @@ class RepoWatch:
         # Ensure the GIT_SSH wrapper is present
         if not os.path.isfile(self.wrapper):
             self.create_ssh_wrapper()
-        env_dict = dict(GIT_SSH=self.wrapper)
+
+        env_dict = os.environ.copy()
+        env_dict['GIT_SSH'] = self.wrapper
         if ssh_key:
             env_dict['PKEY'] = ssh_key
 
