@@ -14,7 +14,7 @@ URL: https://github.com/kincl/repowatch
 Source0:  https://github.com/kincl/%{name}/archive/%{commit0}.tar.gz#/%{name}-%{shortcommit0}.tar.gz
 
 BuildArch:      noarch
-BuildRequires:  python2-devel
+BuildRequires:  python2-devel python-setuptools
 Requires: git python-argparse PyYAML python-daemon python-paramiko
 
 %if 0%{?fedora} >= 17 || 0%{?rhel} >= 7
