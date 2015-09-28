@@ -235,10 +235,12 @@ class RepoWatch:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
+
+        if (os.path.lexists('/dev/log') and
+            (self.args.pidfile or
+             self.args.syslog)):
             self.syslog = logging.handlers.SysLogHandler("/dev/log")
             self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
-
-        if self.args.pidfile:
             self.logger.addHandler(self.syslog)
 
         # Config
@@ -522,6 +524,8 @@ def main():
                         help='Path to projects.yaml file', required=True)
     parser.add_argument('-D', dest='pidfile', action='store', default=False,
                         help='Path to pidfile')
+    parser.add_argument('--syslog', dest='syslog', action='store_true', default=False,
+                        help='log to syslog')
     parser.add_argument('--debug', dest='debug', action='store_true', default=False,
                         help='Debug mode')
 
