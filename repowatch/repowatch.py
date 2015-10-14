@@ -117,8 +117,7 @@ class WatchGerrit(threading.Thread):
         # for all patchsets and drafts we handle those as special
         if event['type'] in ['patchset-created',
                              'draft-published',
-                             'change-restored',
-                             'comment-added']:
+                             'change-restored']:
             self.queue.put({'type': 'update',
                             'project_name': event['change']['project'],
                             'branch_name': event['patchSet']['ref'],
