@@ -343,10 +343,11 @@ class RepoWatch:
     def run_user_cmd(self, cmds, project_name, branch_name):
         """ Allows specifying of commands in config for project to run after project is created or updated """
         project_dir = self.projects[project_name]['path']
+        branch_dir = os.path.join(project_dir, branch_name)
         varmap = {
           '%{branch}': branch_name,
           '%{project}': project_name,
-          '%{branchdir}':  os.path.join(project_dir, branch_name),
+          '%{branchdir}': branch_dir,
           '%{projectdir}': project_dir
         }
 
@@ -355,7 +356,7 @@ class RepoWatch:
 
         # run commands
         for command in cmds:
-            self.run_cmd(command)
+            self.run_cmd(command, cwd=branch_dir)
 
     def _initial_checkout(self):
         """ Look at all branches and check them out """
