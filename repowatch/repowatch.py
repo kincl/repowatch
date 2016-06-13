@@ -407,6 +407,7 @@ class RepoWatch:
             self.run_cmd('git init', cwd=fullpath)
 
         self.run_cmd('git fetch ' \
+                     '--depth 1 ' \
                      'ssh://{0}@{1}:{2}/{3} {4}'.format(self.options[project_type]['username'],
                                                         self.options[project_type]['hostname'],
                                                         self.options[project_type]['port'],
