@@ -370,8 +370,12 @@ class RepoWatch:
                                                                      project),
                                    ssh_key = self.options[data['type']]['key_filename'])
             if remote:
-                for branch in [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]:
-                    self.update_branch(project, branch)
+                for remote_head_str in remote.rstrip('\n').split('\n'):
+                    try:
+                        branch = remote_head_str.split('\t')[1][11:]
+                        self.update_branch(project, branch)
+                    except IndexError:
+                        self.logger.debug('Bad remote head: {0}'.format(remote_head_str))
                 # check out extra branches like issues or changesets
                 for ref, outdir in self.threads[data['type']].get_extra(project):
                     self.update_branch(project, ref, outdir)
