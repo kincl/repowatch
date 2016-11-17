@@ -22,8 +22,7 @@ sed -i "s/%global commit0\ .*/%global commit0 ${COMMIT}/" ${RPMTOPDIR}/SPECS/rep
 sed -i "s/%global commit0_date\ .*/%global commit0_date ${COMMIT_DATE}/" ${RPMTOPDIR}/SPECS/repowatch.spec
 
 # Build SRC and binary RPMs
-rpmbuild    --quiet                       \
-            --define "_topdir ${RPMTOPDIR}" \
+rpmbuild    --define "_topdir ${RPMTOPDIR}" \
             --define "_rpmdir $PWD"       \
             --define "_srcrpmdir $PWD"    \
             --define '_rpmfilename %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm' \
