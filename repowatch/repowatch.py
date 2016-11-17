@@ -337,6 +337,7 @@ class RepoWatch:
                               "Output: {2}".format(p.returncode,
                                                     repr(cmd), 
                                                     repr(out)))
+            return False
         else:
             return out
 
@@ -363,6 +364,12 @@ class RepoWatch:
         self.logger.info('Doing initial checkout of branches')
 
         for project, data in self.projects.items():
+            self.logger.info('Checking that ssh host key is known')
+            known = self.run_cmd('ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']))
+            if known == False:
+                self.logger.error('SSH host key not known! Exiting!')
+                raise Exception # TODO: need more specific Exception here!
+
             remote = self.run_cmd('git ls-remote --heads ' \
                                   'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
                                                                      self.options[data['type']]['hostname'],
