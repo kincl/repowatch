@@ -46,7 +46,6 @@ User specified commands run after checkout.
 TODO
 ----
  - test git binary installed
- - test that ssh host key is valid
 
 Credits
 -------
