@@ -478,7 +478,7 @@ class RepoWatch:
             return
 
         # cleanup old branches on every event process
-        self.cleanup_old_branches()
+        self.cleanup_old_branches(event['project_name'])
         if event['type'] == 'update':
             del event['type']
             self.update_branch(**event)
