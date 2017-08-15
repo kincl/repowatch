@@ -311,6 +311,31 @@ class RepoWatch:
         except Exception, e:
             logging.exception('Error cleaning SSH wrapper')
 
+    def cleanup_old_branches(self, project_name):
+        """ delete local branches which don't exist upstream """
+        self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
+
+        project = self.projects[project_name]
+        remote = self.run_cmd('git ls-remote --heads ' \
+                              'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
+                                                                 self.options[data['type']]['hostname'],
+                                                                 self.options[data['type']]['port'],
+                                                                 project),
+                               ssh_key = self.options[data['type']]['key_filename'])
+        if remote:
+            remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
+            extra_refs = self.threads[data['type']].get_extra(project)
+            extra_branches = [x[1] for x in extra_refs]
+
+            project_path = project['path']
+            local_branches = [name for name in os.listdir(project_path) if os.path.isdir(os.path.join(project_path, name))]
+            for branch in local_branches:
+                if not branch in (remote_branches + extra_branches):
+                    self.delete_branch(project_name, branch)
+        else:
+            self.logger.warn('Did not find remote heads for {0}'.format(project))
+
+
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         """ Run the command and return stdout """
         self.logger.debug('Running {0}'.format(cmd))
@@ -335,7 +360,7 @@ class RepoWatch:
             self.logger.error("Nonzero return code. "\
                               "Code {0}, Exec: {1}, "\
                               "Output: {2}".format(p.returncode,
-                                                    repr(cmd), 
+                                                    repr(cmd),
                                                     repr(out)))
             return False
         else:
@@ -452,6 +477,8 @@ class RepoWatch:
         if not self.project_is_valid(event['project_name']):
             return
 
+        # cleanup old branches on every event process
+        self.cleanup_old_branches()
         if event['type'] == 'update':
             del event['type']
             self.update_branch(**event)
