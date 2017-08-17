@@ -335,7 +335,7 @@ class RepoWatch:
             self.logger.error("Nonzero return code. "\
                               "Code {0}, Exec: {1}, "\
                               "Output: {2}".format(p.returncode,
-                                                    repr(cmd), 
+                                                    repr(cmd),
                                                     repr(out)))
             return False
         else:
