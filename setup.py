@@ -15,4 +15,4 @@ setup(name='repowatch',
       packages=['repowatch'],
       install_requires=deps,
       tests_require=deps,
-      entry_points= { 'console_scripts': ['repowatch=repowatch.repowatch:main'] })
+      entry_points={'console_scripts': ['repowatch=repowatch.cli:main']})
