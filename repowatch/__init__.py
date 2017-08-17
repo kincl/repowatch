@@ -48,9 +48,8 @@ def FakeContext():
 class RepoWatch:
     """ Manages the threads that watch for events and acts on events that come in """
 
-    def __init__(self, args):
+    def __init__(self, config_file, project_file, pid_file, syslog, debug):
         self.queue = Queue.Queue()
-        self.args = args
 
         # read project config to determine what threads we need to start
         self.projects = {}
@@ -58,19 +57,23 @@ class RepoWatch:
         self.threads = dict()
         self.wrapper = None
 
+        self.project_file = project_file
+        self.config_file = config_file
+        self.pid_file = pid_file
+
         # Logging
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger('repowatch')
         self.logger.setLevel(logging.INFO)
 
-        if self.args.debug:
+        if debug:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
 
         if (os.path.lexists('/dev/log') and
-                (self.args.pidfile or
-                 self.args.syslog)):
+                (pid_file or
+                 syslog)):
             self.syslog = logging.handlers.SysLogHandler("/dev/log")
             self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
             self.logger.addHandler(self.syslog)
@@ -80,9 +83,9 @@ class RepoWatch:
         self.logger.info('Reading config')
         needed = dict(gerrit=False, gitlab=False)
         try:
-            project_yaml = open(self.args.projects)
+            project_yaml = open(self.project_file)
         except IOError:
-            self.logger.error('Could not find project yaml file at: %s', self.args.projects)
+            self.logger.error('Could not find project yaml file at: %s', self.project_file)
             raise Exception
         for p in yaml.safe_load(project_yaml):
             self.projects[p['project']] = p
@@ -96,13 +99,11 @@ class RepoWatch:
 
         config = ConfigParser.ConfigParser()
         try:
-            config_ini = open(self.args.config)
+            config_ini = open(self.config_file)
         except IOError:
-            self.logger.error('Could not find config file at: %s', self.args.config)
+            self.logger.error('Could not find config file at: %s', self.config_file)
             raise Exception
         config.readfp(config_ini)
-
-        get_class = lambda x: globals()[x]
 
         for repo, need in needed.items():
             if need:
@@ -114,9 +115,9 @@ class RepoWatch:
                     sys.exit(1)
 
                 self.options[repo] = _options
-                modu = get_class('Watch{0}'.format(repo.capitalize()))
+                modul = getattr('repowatch', 'Watch{0}'.format(repo.capitalize()))
                 try:
-                    self.threads[repo] = modu(_options, self.queue)
+                    self.threads[repo] = modul(_options, self.queue)
                 except Exception as e:
                     self.logger.info('Error instantiating watcher: %s', e)
                 self.threads[repo].daemon = True
@@ -325,8 +326,8 @@ class RepoWatch:
     def run(self):
         """Run."""
 
-        if self.args.pidfile:
-            pidfile = pidlockfile.PIDLockFile(self.args.pidfile)
+        if self.pid_file:
+            pidfile = pidlockfile.PIDLockFile(self.pid_file)
             context = daemon.DaemonContext(pidfile=pidfile)
             # because of https://github.com/paramiko/paramiko/issues/59
             context.files_preserve = self.files_preserve_by_path('/dev/urandom')
@@ -336,7 +337,7 @@ class RepoWatch:
         try:
             self.setup()
 
-            if self.args.pidfile:
+            if self.pid_file:
                 # try and see if we can since it seems that the context doesn't throw a exception
                 pidfile.acquire(timeout=2)
                 pidfile.release()
