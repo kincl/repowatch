@@ -1,7 +1,7 @@
 import json
 import logging
 import argparse
-import RepoWatch
+import repowatch
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
