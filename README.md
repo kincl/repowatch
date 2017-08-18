@@ -1,15 +1,14 @@
-RepoWatch
-=========
+# RepoWatch
+
+[![Build Status](https://travis-ci.org/kincl/repowatch.svg?branch=master)](https://travis-ci.org/kincl/repowatch)
 
 Takes Gerrit events or GitLab Web Hooks and updates the correct branch of a puppet checkout
 
-Requirements
-------------
+## Requirements
 
 `yum install git python-argparse PyYAML python-daemon python-paramiko`
 
-Installation/Configuration
---------------------------
+## Installation/Configuration
 Configuration is done with two files:
 
 repowatch.conf:
@@ -43,12 +42,7 @@ projects.yaml:
 
 User specified commands run after checkout.
 
-TODO
-----
- - test git binary installed
-
-Credits
--------
+## Credits
 Gerrit watcher code is based on https://github.com/atdt/gerrit-stream
 
 Apache license
