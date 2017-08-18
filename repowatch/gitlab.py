@@ -41,17 +41,19 @@ class GitlabHTTPHandler(BaseHTTPRequestHandler):
         self.wfile.write("OK")
         return
 
-    def log_message(self, format, *args):
+    def log_message(self, fmt, *args):
         logger = logging.getLogger('repowatch.gitlab')
         logger.info("%s - - [%s] %s",
                     self.address_string(),
                     self.log_date_time_string(),
-                    format%args)
+                    fmt % args)
+
 
 class GitlabHTTPServer(HTTPServer):
     def __init__(self, server_address, RequestHandlerClass, queue):
         self.queue = queue
         HTTPServer.__init__(self, server_address, RequestHandlerClass)
+
 
 class WatchGitlab(threading.Thread):
     """ Starts HTTP server and listens for requests """

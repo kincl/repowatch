@@ -6,11 +6,12 @@ from os.path import basename, dirname
 
 import paramiko
 
+
 class WatchGerrit(threading.Thread):
     """ Threaded job; listens for Gerrit events and puts them in a queue """
 
     def __init__(self, options, queue):
-        options['port'] = int(options['port']) # convert to int?
+        options['port'] = int(options['port'])  # convert to int?
         if 'timeout' not in options:
             options['timeout'] = 60
         self.options = options
@@ -29,7 +30,8 @@ class WatchGerrit(threading.Thread):
             client.load_system_host_keys()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(**self.options)
-            _, stdout, _ = client.exec_command('gerrit query "status:open project:{0}" --patch-sets --format json'.format(project))
+            _, stdout, _ = client.exec_command('gerrit query "status:open project:{0}" '
+                                               '--patch-sets --format json'.format(project))
             for line in stdout:
                 # get
                 data = json.loads(line)
@@ -56,7 +58,7 @@ class WatchGerrit(threading.Thread):
                 client.get_transport().set_keepalive(60)
                 _, stdout, _ = client.exec_command('gerrit stream-events')
                 for line in stdout:
-                    #self.queue.put(json.loads(line))
+                    # self.queue.put(json.loads(line))
                     self.handle_event(json.loads(line))
             except Exception as e:
                 logging.exception('WatchGerrit: error: %s', str(e))

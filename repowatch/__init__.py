@@ -2,9 +2,6 @@
 # -*- coding: utf-8 -*-
 # vi:ts=4:softtabstop=4:shiftwidth=4
 
-import ConfigParser
-import Queue
-
 import os
 import sys
 import subprocess
@@ -12,6 +9,9 @@ import shutil
 
 import logging
 import logging.handlers
+
+import Queue
+import ConfigParser
 
 from resource import getrlimit, RLIMIT_NOFILE
 
@@ -28,6 +28,9 @@ except ImportError:
 
 import yaml
 
+from .gitlab import WatchGitlab
+from .gerrit import WatchGerrit
+
 ONEYEAR = 365*24*60*60
 GIT_SSH_WRAPPER = '''#!/bin/sh
 
@@ -42,11 +45,23 @@ fi
 
 @contextmanager
 def FakeContext():
-    """ This allows us to call with context: but not provide a DaemonContext """
+    '''
+     This allows us to call with context: but not provide a DaemonContext
+    '''
     yield
 
-class RepoWatch:
-    """ Manages the threads that watch for events and acts on events that come in """
+
+def get_class(classname):
+    '''
+    Gets a class that is in the global scope by looking up the name
+    '''
+    return globals()[classname]
+
+
+class RepoWatch(object):
+    '''
+    Manages the threads that watch for events and acts on events that come in
+    '''
 
     def __init__(self, config_file, project_file, pid_file, syslog, debug):
         self.queue = Queue.Queue()
@@ -115,7 +130,7 @@ class RepoWatch:
                     sys.exit(1)
 
                 self.options[repo] = _options
-                modul = getattr('repowatch', 'Watch{0}'.format(repo.capitalize()))
+                modul = get_class('Watch{0}'.format(repo.capitalize()))
                 try:
                     self.threads[repo] = modul(_options, self.queue)
                 except Exception as e:
@@ -140,7 +155,7 @@ class RepoWatch:
             logging.exception('Error cleaning SSH wrapper')
 
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
-        """ Run the command and return stdout """
+        ''' Run the command and return stdout '''
         self.logger.debug('Running %s', cmd)
 
         # Ensure the GIT_SSH wrapper is present
@@ -160,8 +175,8 @@ class RepoWatch:
         out, _ = p.communicate()
         out = out.strip()
         if p.returncode != 0:
-            self.logger.error("Nonzero return code. "\
-                              "Code %s, Exec: %s, "\
+            self.logger.error("Nonzero return code. "
+                              "Code %s, Exec: %s, "
                               "Output: %s",
                               p.returncode,
                               repr(cmd),
@@ -170,10 +185,10 @@ class RepoWatch:
         return out
 
     def run_user_cmd(self, cmds, project_name, branch_name):
-        """
+        '''
         Allows specifying of commands in config for project
         to run after project is created or updated
-        """
+        '''
         project_dir = self.projects[project_name]['path']
         branch_dir = os.path.join(project_dir, branch_name)
         varmap = {
@@ -191,7 +206,7 @@ class RepoWatch:
             self.run_cmd(command, cwd=branch_dir)
 
     def _initial_checkout(self):
-        """ Look at all branches and check them out """
+        ''' Look at all branches and check them out '''
         self.logger.info('Doing initial checkout of branches')
 
         for project, data in self.projects.items():
@@ -199,9 +214,9 @@ class RepoWatch:
             known = self.run_cmd('ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']))
             if known is False:
                 self.logger.error('SSH host key not known! Exiting!')
-                raise Exception # TODO: need more specific Exception here!
+                raise Exception  # TODO: need more specific Exception here!
 
-            remote = self.run_cmd('git ls-remote --heads ' \
+            remote = self.run_cmd('git ls-remote --heads '
                                   'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
                                                                      self.options[data['type']]['hostname'],
                                                                      self.options[data['type']]['port'],
@@ -221,13 +236,13 @@ class RepoWatch:
                 self.logger.warn('Did not find remote heads for %s', project)
 
     def update_branch(self, project_name, branch_name, output_dir=None):
-        """ Do the actual branch update
+        ''' Do the actual branch update
 
             project_name: name of the repository project
             branch_name: name of the branch to checkout
             output_dir: directory to checkout branch into, defaults to branch_name
 
-        """
+        '''
         if output_dir is None:
             output_dir = branch_name
         fullpath = self.projects[project_name]['path']+'/'+output_dir
@@ -251,8 +266,8 @@ class RepoWatch:
             os.makedirs(fullpath)
             self.run_cmd('git init', cwd=fullpath)
 
-        self.run_cmd('git fetch ' \
-                     '--depth 1 ' \
+        self.run_cmd('git fetch '
+                     '--depth 1 '
                      'ssh://{0}@{1}:{2}/{3} {4}'.format(self.options[project_type]['username'],
                                                         self.options[project_type]['hostname'],
                                                         self.options[project_type]['port'],
@@ -280,7 +295,7 @@ class RepoWatch:
         return True if project_name in self.projects.keys() else False
 
     def _do_handle_one_event(self):
-        """ Handles an event off the queue """
+        ''' Handles an event off the queue '''
         self.logger.debug('Waiting for event')
         event = self.queue.get(True, ONEYEAR)
 
@@ -295,7 +310,7 @@ class RepoWatch:
             self.delete_branch(**event)
 
     def main_loop(self):
-        """Does the looping and handling events."""
+        '''Does the looping and handling events.'''
 
         still_running = True
         while still_running:
@@ -324,7 +339,7 @@ class RepoWatch:
         return [fd for fd in xrange(fd_max) if fd_wanted(fd)]
 
     def run(self):
-        """Run."""
+        '''Run.'''
 
         if self.pid_file:
             pidfile = pidlockfile.PIDLockFile(self.pid_file)
@@ -358,7 +373,7 @@ class RepoWatch:
             self.logger.info('Shutting down')
             try:
                 self.cleanup_ssh_wrapper(self.wrapper)
-            except:
+            except Exception:
                 self.logger.info('No SSH wrapper to clean?')
             for _, thread in self.threads.items():
                 if thread.is_alive():

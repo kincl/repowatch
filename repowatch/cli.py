@@ -2,6 +2,7 @@ import argparse
 
 from . import RepoWatch
 
+
 def cli():
     parser = argparse.ArgumentParser(description='Watch Gerrit/GitLab and checkout branches')
     parser.add_argument('-C', dest='config_file', action='store',
@@ -18,6 +19,7 @@ def cli():
     args = parser.parse_args()
     watcher = RepoWatch(args.config, args.project, args.pid_file, args.syslog, args.debug)
     watcher.run()
+
 
 if __name__ == '__main__':
     cli()
