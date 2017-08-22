@@ -154,6 +154,31 @@ class RepoWatch(object):
         except Exception as e:
             logging.exception('Error cleaning SSH wrapper')
 
+    def cleanup_old_branches(self, project_name):
+        """ delete local branches which don't exist upstream """
+        self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
+
+        project = self.projects[project_name]
+        remote = self.run_cmd('git ls-remote --heads '
+                              'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
+                                                                 self.options[data['type']]['hostname'],
+                                                                 self.options[data['type']]['port'],
+                                                                 project),
+                              ssh_key=self.options[data['type']]['key_filename'])
+        if remote:
+            remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
+            extra_refs = self.threads[data['type']].get_extra(project)
+            extra_branches = [x[1] for x in extra_refs]
+
+            project_path = project['path']
+            local_branches = [name for name in os.listdir(project_path)
+                              if os.path.isdir(os.path.join(project_path, name))]
+            for branch in local_branches:
+                if branch not in (remote_branches + extra_branches):
+                    self.delete_branch(project_name, branch)
+        else:
+            self.logger.warn('Did not find remote heads for {0}'.format(project))
+
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         ''' Run the command and return stdout '''
         self.logger.debug('Running %s', cmd)
@@ -306,6 +331,8 @@ class RepoWatch(object):
             del event['type']
             self.update_branch(**event)
         elif event['type'] == 'delete':
+            # cleanup old branches on every event process
+            self.cleanup_old_branches(event['project_name'])
             del event['type']
             self.delete_branch(**event)
 
