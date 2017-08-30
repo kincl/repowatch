@@ -1,7 +1,7 @@
 from setuptools import setup
 
 deps = ['PyYAML',
-        'daemon',
+        'python-daemon',
         'lockfile',
         'paramiko',]
 
