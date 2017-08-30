@@ -17,7 +17,7 @@ def cli():
                         help='Debug mode')
 
     args = parser.parse_args()
-    watcher = RepoWatch(args.config, args.project, args.pid_file, args.syslog, args.debug)
+    watcher = RepoWatch(args.config_file, args.project_file, args.pid_file, args.syslog, args.debug)
     watcher.run()
 
 
