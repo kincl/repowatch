@@ -159,35 +159,27 @@ class RepoWatch(object):
         self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
 
         data = self.projects[project_name]
-        self.logger.info('koch: Running git-ls-remote')
         remote = self.run_cmd('git ls-remote --heads '
                               'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
                                                                  self.options[data['type']]['hostname'],
                                                                  self.options[data['type']]['port'],
                                                                  project_name),
                               ssh_key=self.options[data['type']]['key_filename'])
-        self.logger.info('koch: after git-ls-remote')
         if remote:
-            self.logger.info('koch: if remote')
             remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
             #extra_refs = self.threads[data['type']].get_extra(project)
             #extra_branches = [x[1] for x in extra_refs]
 
-            self.logger.info('koch: after extra_branches')
 
             project_path = data['path']
-            self.logger.info('koch: after project_path')
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
-            self.logger.info('koch: after local_branches')
             for branch in local_branches:
-                self.logger.info('koch: inside local_branches for loop')
                 if branch not in (remote_branches):
                     self.delete_branch(project_name, branch)
         else:
             self.logger.warn('Did not find remote heads for {0}'.format(project_name))
         
-        self.logger.info('koch: leaving cleanup_old_branches')
 
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         ''' Run the command and return stdout '''
