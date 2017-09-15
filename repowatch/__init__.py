@@ -175,15 +175,19 @@ class RepoWatch(object):
 
             self.logger.info('koch: after extra_branches')
 
-            project_path = project['path']
+            project_path = data['path']
+            self.logger.info('koch: after project_path')
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
+            self.logger.info('koch: after local_branches')
             for branch in local_branches:
                 self.logger.info('koch: inside local_branches for loop')
                 if branch not in (remote_branches):
                     self.delete_branch(project_name, branch)
         else:
-            self.logger.warn('Did not find remote heads for {0}'.format(project))
+            self.logger.warn('Did not find remote heads for {0}'.format(project_name))
+        
+        self.logger.info('koch: leaving cleanup_old_branches')
 
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         ''' Run the command and return stdout '''
