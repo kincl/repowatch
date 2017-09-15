@@ -175,7 +175,6 @@ class RepoWatch(object):
                     self.delete_branch(project_name, branch)
         else:
             self.logger.warn('Did not find remote heads for {0}'.format(project_name))
-        
 
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         ''' Run the command and return stdout '''
@@ -310,9 +309,9 @@ class RepoWatch(object):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
         if os.path.isdir(fullpath):
             self.logger.info('Delete repo/branch: %s:%s at %s',
-                         project_name,
-                         branch_name,
-                         fullpath)
+                             project_name,
+                             branch_name,
+                             fullpath)
             shutil.rmtree(fullpath)
 
     def project_is_valid(self, project_name):
