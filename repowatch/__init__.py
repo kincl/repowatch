@@ -320,7 +320,7 @@ class RepoWatch(object):
 
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
-        if not os.path.isdir(fullpath):
+        if os.path.isdir(fullpath):
           self.logger.info('Delete repo/branch: %s:%s at %s',
                          project_name,
                          branch_name,
