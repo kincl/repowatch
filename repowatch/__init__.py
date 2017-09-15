@@ -309,11 +309,11 @@ class RepoWatch(object):
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
         if os.path.isdir(fullpath):
-          self.logger.info('Delete repo/branch: %s:%s at %s',
+            self.logger.info('Delete repo/branch: %s:%s at %s',
                          project_name,
                          branch_name,
                          fullpath)
-          shutil.rmtree(fullpath)
+            shutil.rmtree(fullpath)
 
     def project_is_valid(self, project_name):
         return True if project_name in self.projects.keys() else False
