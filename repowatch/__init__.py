@@ -158,13 +158,13 @@ class RepoWatch(object):
         """ delete local branches which don't exist upstream """
         self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
 
-        project = self.projects[project_name]
+        data = self.projects[project_name]
         self.logger.info('koch: Running git-ls-remote')
         remote = self.run_cmd('git ls-remote --heads '
                               'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
                                                                  self.options[data['type']]['hostname'],
                                                                  self.options[data['type']]['port'],
-                                                                 project),
+                                                                 project_name),
                               ssh_key=self.options[data['type']]['key_filename'])
         self.logger.info('koch: after git-ls-remote')
         if remote:
