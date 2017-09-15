@@ -170,8 +170,8 @@ class RepoWatch(object):
         if remote:
             self.logger.info('koch: if remote')
             remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
-            extra_refs = self.threads[data['type']].get_extra(project)
-            extra_branches = [x[1] for x in extra_refs]
+            #extra_refs = self.threads[data['type']].get_extra(project)
+            #extra_branches = [x[1] for x in extra_refs]
 
             self.logger.info('koch: after extra_branches')
 
@@ -180,7 +180,7 @@ class RepoWatch(object):
                               if os.path.isdir(os.path.join(project_path, name))]
             for branch in local_branches:
                 self.logger.info('koch: inside local_branches for loop')
-                if branch not in (remote_branches + extra_branches):
+                if branch not in (remote_branches):
                     self.delete_branch(project_name, branch)
         else:
             self.logger.warn('Did not find remote heads for {0}'.format(project))
