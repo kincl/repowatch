@@ -320,11 +320,12 @@ class RepoWatch(object):
 
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
-        self.logger.info('Delete repo/branch: %s:%s at %s',
+        if ! os.path.isdir(fullpath):
+          self.logger.info('Delete repo/branch: %s:%s at %s',
                          project_name,
                          branch_name,
                          fullpath)
-        shutil.rmtree(fullpath)
+          shutil.rmtree(fullpath)
 
     def project_is_valid(self, project_name):
         return True if project_name in self.projects.keys() else False
@@ -344,7 +345,7 @@ class RepoWatch(object):
             # cleanup old branches on every event process
             self.cleanup_old_branches(event['project_name'])
             del event['type']
-            self.delete_branch(**event)
+            #self.delete_branch(**event)
 
     def main_loop(self):
         '''Does the looping and handling events.'''
