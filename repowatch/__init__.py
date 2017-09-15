@@ -158,26 +158,23 @@ class RepoWatch(object):
         """ delete local branches which don't exist upstream """
         self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
 
-        project = self.projects[project_name]
+        data = self.projects[project_name]
         remote = self.run_cmd('git ls-remote --heads '
                               'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
                                                                  self.options[data['type']]['hostname'],
                                                                  self.options[data['type']]['port'],
-                                                                 project),
+                                                                 project_name),
                               ssh_key=self.options[data['type']]['key_filename'])
         if remote:
             remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
-            extra_refs = self.threads[data['type']].get_extra(project)
-            extra_branches = [x[1] for x in extra_refs]
-
-            project_path = project['path']
+            project_path = data['path']
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
             for branch in local_branches:
-                if branch not in (remote_branches + extra_branches):
+                if branch not in (remote_branches):
                     self.delete_branch(project_name, branch)
         else:
-            self.logger.warn('Did not find remote heads for {0}'.format(project))
+            self.logger.warn('Did not find remote heads for {0}'.format(project_name))
 
     def run_cmd(self, cmd, ssh_key=None, **kwargs):
         ''' Run the command and return stdout '''
@@ -310,11 +307,12 @@ class RepoWatch(object):
 
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
-        self.logger.info('Delete repo/branch: %s:%s at %s',
-                         project_name,
-                         branch_name,
-                         fullpath)
-        shutil.rmtree(fullpath)
+        if os.path.isdir(fullpath):
+            self.logger.info('Delete repo/branch: %s:%s at %s',
+                             project_name,
+                             branch_name,
+                             fullpath)
+            shutil.rmtree(fullpath)
 
     def project_is_valid(self, project_name):
         return True if project_name in self.projects.keys() else False
@@ -334,7 +332,6 @@ class RepoWatch(object):
             # cleanup old branches on every event process
             self.cleanup_old_branches(event['project_name'])
             del event['type']
-            self.delete_branch(**event)
 
     def main_loop(self):
         '''Does the looping and handling events.'''
