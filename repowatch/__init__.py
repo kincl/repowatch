@@ -167,10 +167,6 @@ class RepoWatch(object):
                               ssh_key=self.options[data['type']]['key_filename'])
         if remote:
             remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
-            #extra_refs = self.threads[data['type']].get_extra(project)
-            #extra_branches = [x[1] for x in extra_refs]
-
-
             project_path = data['path']
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
@@ -337,7 +333,6 @@ class RepoWatch(object):
             # cleanup old branches on every event process
             self.cleanup_old_branches(event['project_name'])
             del event['type']
-            #self.delete_branch(**event)
 
     def main_loop(self):
         '''Does the looping and handling events.'''
