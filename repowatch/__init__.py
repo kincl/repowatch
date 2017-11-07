@@ -156,10 +156,8 @@ class RepoWatch(object):
         data = self.projects[project_name]
         remote = run_cmd('git ls-remote --heads '
                          'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
-                                                            self.options[data['type']
-                                                                         ]['hostname'],
-                                                            self.options[data['type']
-                                                                         ]['port'],
+                                                            self.options[data['type']]['hostname'],
+                                                            self.options[data['type']]['port'],
                                                             project_name),
                          ssh_key=self.options[data['type']]['key_filename'])
         if remote:
@@ -189,10 +187,8 @@ class RepoWatch(object):
 
             remote = run_cmd('git ls-remote --heads '
                              'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
-                                                                self.options[data['type']
-                                                                             ]['hostname'],
-                                                                self.options[data['type']
-                                                                             ]['port'],
+                                                                self.options[data['type']]['hostname'],
+                                                                self.options[data['type']]['port'],
                                                                 project),
                              ssh_key=self.options[data['type']].get('key_filename', None))
             if remote:
