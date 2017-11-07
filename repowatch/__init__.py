@@ -4,8 +4,7 @@
 
 import os
 import sys
-import subprocess
-import shutil
+import traceback
 
 import logging
 import logging.handlers
@@ -16,8 +15,6 @@ import ConfigParser
 from resource import getrlimit, RLIMIT_NOFILE
 
 from contextlib import contextmanager
-import tempfile
-import stat
 
 import daemon
 import lockfile
@@ -26,21 +23,16 @@ try:
 except ImportError:
     from daemon import pidlockfile
 
+from time import sleep
+
 import yaml
 
 from .gitlab import WatchGitlab
 from .gerrit import WatchGerrit
+from .worker import Worker
+from .util import create_ssh_wrapper, cleanup_ssh_wrapper, run_cmd
 
-ONEYEAR = 365*24*60*60
-GIT_SSH_WRAPPER = '''#!/bin/sh
-
-if [ -z "$PKEY" ]; then
-    # if PKEY is not specified, run ssh using default keyfile
-    ssh "$@"
-else
-    ssh -oStrictHostKeyChecking=no -i "$PKEY" "$@"
-fi
-'''
+DEFAULT_THREADS = 2
 
 
 @contextmanager
@@ -72,12 +64,15 @@ class RepoWatch(object):
         self.threads = dict()
         self.wrapper = None
 
+        self.worker_threads = 0
+
         self.project_file = project_file
         self.config_file = config_file
         self.pid_file = pid_file
 
         # Logging
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            level=logging.INFO, format='%(asctime)s %(threadName)s:%(name)s:%(levelname)s:%(message)s')
         self.logger = logging.getLogger('repowatch')
         self.logger.setLevel(logging.INFO)
 
@@ -90,7 +85,8 @@ class RepoWatch(object):
                 (pid_file or
                  syslog)):
             self.syslog = logging.handlers.SysLogHandler("/dev/log")
-            self.syslog.setFormatter(logging.Formatter("RepoWatch[%(process)s]: %(name)s: %(message)s"))
+            self.syslog.setFormatter(logging.Formatter(
+                "RepoWatch[%(process)s]: %(threadName)s:%(name)s: %(message)s"))
             self.logger.addHandler(self.syslog)
 
     def setup(self):
@@ -100,7 +96,8 @@ class RepoWatch(object):
         try:
             project_yaml = open(self.project_file)
         except IOError:
-            self.logger.error('Could not find project yaml file at: %s', self.project_file)
+            self.logger.error(
+                'Could not find project yaml file at: %s', self.project_file)
             raise Exception
         for p in yaml.safe_load(project_yaml):
             self.projects[p['project']] = p
@@ -116,9 +113,12 @@ class RepoWatch(object):
         try:
             config_ini = open(self.config_file)
         except IOError:
-            self.logger.error('Could not find config file at: %s', self.config_file)
+            self.logger.error(
+                'Could not find config file at: %s', self.config_file)
             raise Exception
         config.readfp(config_ini)
+
+        self.wrapper = create_ssh_wrapper()
 
         for repo, need in needed.items():
             if need:
@@ -126,7 +126,8 @@ class RepoWatch(object):
                 try:
                     _options.update(config.items(repo))
                 except ConfigParser.NoSectionError:
-                    logging.exception('Unable to read %s configuration? Does it exist?', repo)
+                    logging.exception(
+                        'Unable to read %s configuration? Does it exist?', repo)
                     sys.exit(1)
 
                 self.options[repo] = _options
@@ -137,36 +138,33 @@ class RepoWatch(object):
                     self.logger.info('Error instantiating watcher: %s', e)
                 self.threads[repo].daemon = True
 
+                num_threads = int(_options.get('threads', DEFAULT_THREADS))
+                self.worker_threads += num_threads
+                for i in range(0, num_threads):
+                    thread_name = '{0}-worker-{1}'.format(repo, i)
+                    self.threads[thread_name] = Worker(
+                        _options, self.queue, self.wrapper, self.projects)
+                    self.threads[thread_name].daemon = True
+
         self.logger.info('Finished config')
-        self.create_ssh_wrapper()
-
-    def create_ssh_wrapper(self):
-        with tempfile.NamedTemporaryFile(prefix='tmp-GIT_SSH-wrapper-', delete=False) as fh:
-            fh.write(GIT_SSH_WRAPPER)
-            os.chmod(fh.name, stat.S_IRUSR | stat.S_IXUSR)
-            self.logger.debug('Created SSH wrapper: %s', fh.name)
-            self.wrapper = fh.name
-
-    def cleanup_ssh_wrapper(self, wrapper):
-        self.logger.debug('Cleaning SSH wrapper: %s', wrapper)
-        try:
-            os.unlink(wrapper)
-        except Exception as e:
-            logging.exception('Error cleaning SSH wrapper')
 
     def cleanup_old_branches(self, project_name):
         """ delete local branches which don't exist upstream """
-        self.logger.info('Cleaning up local branches on project {0}'.format(project_name))
+        self.logger.info(
+            'Cleaning up local branches on project {0}'.format(project_name))
 
         data = self.projects[project_name]
-        remote = self.run_cmd('git ls-remote --heads '
-                              'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
-                                                                 self.options[data['type']]['hostname'],
-                                                                 self.options[data['type']]['port'],
-                                                                 project_name),
-                              ssh_key=self.options[data['type']]['key_filename'])
+        remote = run_cmd('git ls-remote --heads '
+                         'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
+                                                            self.options[data['type']
+                                                                         ]['hostname'],
+                                                            self.options[data['type']
+                                                                         ]['port'],
+                                                            project_name),
+                         ssh_key=self.options[data['type']]['key_filename'])
         if remote:
-            remote_branches = [h.split('\t')[1][11:] for h in remote.rstrip('\n').split('\n')]
+            remote_branches = [h.split('\t')[1][11:]
+                               for h in remote.rstrip('\n').split('\n')]
             project_path = data['path']
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
@@ -174,58 +172,8 @@ class RepoWatch(object):
                 if branch not in (remote_branches):
                     self.delete_branch(project_name, branch)
         else:
-            self.logger.warn('Did not find remote heads for {0}'.format(project_name))
-
-    def run_cmd(self, cmd, ssh_key=None, **kwargs):
-        ''' Run the command and return stdout '''
-        self.logger.debug('Running %s', cmd)
-
-        # Ensure the GIT_SSH wrapper is present
-        if not os.path.isfile(self.wrapper):
-            self.create_ssh_wrapper()
-
-        env_dict = os.environ.copy()
-        env_dict['GIT_SSH'] = self.wrapper
-        if ssh_key:
-            env_dict['PKEY'] = ssh_key
-
-        p = subprocess.Popen(cmd.split(),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT,
-                             env=env_dict,
-                             **kwargs)
-        out, _ = p.communicate()
-        out = out.strip()
-        if p.returncode != 0:
-            self.logger.error("Nonzero return code. "
-                              "Code %s, Exec: %s, "
-                              "Output: %s",
-                              p.returncode,
-                              repr(cmd),
-                              repr(out))
-            return False
-        return out
-
-    def run_user_cmd(self, cmds, project_name, branch_name):
-        '''
-        Allows specifying of commands in config for project
-        to run after project is created or updated
-        '''
-        project_dir = self.projects[project_name]['path']
-        branch_dir = os.path.join(project_dir, branch_name)
-        varmap = {
-            '%{branch}': branch_name,
-            '%{project}': project_name,
-            '%{branchdir}': branch_dir,
-            '%{projectdir}': project_dir
-        }
-
-        # replace variables with real values
-        cmds = [reduce(lambda x, y: x.replace(y, varmap[y]), varmap, s) for s in cmds]
-
-        # run commands
-        for command in cmds:
-            self.run_cmd(command, cwd=branch_dir)
+            self.logger.warn(
+                'Did not find remote heads for {0}'.format(project_name))
 
     def _initial_checkout(self):
         ''' Look at all branches and check them out '''
@@ -233,115 +181,37 @@ class RepoWatch(object):
 
         for project, data in self.projects.items():
             self.logger.info('Checking that ssh host key is known')
-            known = self.run_cmd('ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']))
+            known = run_cmd(
+                'ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']))
             if known is False:
                 self.logger.error('SSH host key not known! Exiting!')
                 raise Exception  # TODO: need more specific Exception here!
 
-            remote = self.run_cmd('git ls-remote --heads '
-                                  'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
-                                                                     self.options[data['type']]['hostname'],
-                                                                     self.options[data['type']]['port'],
-                                                                     project),
-                                  ssh_key=self.options[data['type']]['key_filename'])
+            remote = run_cmd('git ls-remote --heads '
+                             'ssh://{0}@{1}:{2}/{3}.git'.format(self.options[data['type']]['username'],
+                                                                self.options[data['type']
+                                                                             ]['hostname'],
+                                                                self.options[data['type']
+                                                                             ]['port'],
+                                                                project),
+                             ssh_key=self.options[data['type']].get('key_filename', None))
             if remote:
                 for remote_head_str in remote.rstrip('\n').split('\n'):
                     try:
                         branch = remote_head_str.split('\t')[1][11:]
-                        self.update_branch(project, branch)
+                        self.logger.debug(
+                            'Adding project branch to queue: {0}:{1}'.format(project, branch))
+                        self.queue.put({'type': 'update',
+                                        'project_name': project,
+                                        'branch_name': branch})
                     except IndexError:
-                        self.logger.debug('Bad remote head: %s', remote_head_str)
-                # check out extra branches like issues or changesets
-                for ref, outdir in self.threads[data['type']].get_extra(project):
-                    self.update_branch(project, ref, outdir)
+                        self.logger.debug(
+                            'Bad remote head: %s', remote_head_str)
+                # check out extra branches like issues or changesets TODO
+                # for ref, outdir in self.threads[data['type']].get_extra(project):
+                #     self.update_branch(project, ref, outdir)
             else:
                 self.logger.warn('Did not find remote heads for %s', project)
-
-    def update_branch(self, project_name, branch_name, output_dir=None):
-        ''' Do the actual branch update
-
-            project_name: name of the repository project
-            branch_name: name of the branch to checkout
-            output_dir: directory to checkout branch into, defaults to branch_name
-
-        '''
-        if output_dir is None:
-            output_dir = branch_name
-        fullpath = self.projects[project_name]['path']+'/'+output_dir
-        project_type = self.projects[project_name]['type']
-
-        try:
-            cmds = self.projects[project_name]['cmds']
-        except KeyError:
-            cmds = None
-
-        self.logger.info('Update repo branch: %s:%s in %s',
-                         project_name,
-                         branch_name,
-                         fullpath)
-
-        if os.path.isdir(fullpath):
-            if not os.path.isdir(os.path.join(fullpath, '.git')):
-                self.run_cmd('git init', cwd=fullpath)
-        else:
-            # create branch dir
-            os.makedirs(fullpath)
-            self.run_cmd('git init', cwd=fullpath)
-
-        self.run_cmd('git fetch '
-                     '--depth 1 '
-                     'ssh://{0}@{1}:{2}/{3} {4}'.format(self.options[project_type]['username'],
-                                                        self.options[project_type]['hostname'],
-                                                        self.options[project_type]['port'],
-                                                        project_name,
-                                                        branch_name),
-                     ssh_key=self.options[project_type]['key_filename'],
-                     cwd=fullpath)
-
-        self.run_cmd('git checkout -f FETCH_HEAD ',
-                     cwd=fullpath)
-
-        # run user defined commands
-        if cmds:
-            self.run_user_cmd(cmds, project_name, output_dir)
-
-    def delete_branch(self, project_name, branch_name):
-        fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)
-        if os.path.isdir(fullpath):
-            self.logger.info('Delete repo/branch: %s:%s at %s',
-                             project_name,
-                             branch_name,
-                             fullpath)
-            shutil.rmtree(fullpath)
-
-    def project_is_valid(self, project_name):
-        return True if project_name in self.projects.keys() else False
-
-    def _do_handle_one_event(self):
-        ''' Handles an event off the queue '''
-        self.logger.debug('Waiting for event')
-        event = self.queue.get(True, ONEYEAR)
-
-        if not self.project_is_valid(event['project_name']):
-            return
-
-        if event['type'] == 'update':
-            del event['type']
-            self.update_branch(**event)
-        elif event['type'] == 'delete':
-            # cleanup old branches on every event process
-            self.cleanup_old_branches(event['project_name'])
-            del event['type']
-
-    def main_loop(self):
-        '''Does the looping and handling events.'''
-
-        still_running = True
-        while still_running:
-            try:
-                self._do_handle_one_event()
-            except KeyboardInterrupt:
-                still_running = False
 
     @staticmethod
     def files_preserve_by_path(*paths):
@@ -369,7 +239,8 @@ class RepoWatch(object):
             pidfile = pidlockfile.PIDLockFile(self.pid_file)
             context = daemon.DaemonContext(pidfile=pidfile)
             # because of https://github.com/paramiko/paramiko/issues/59
-            context.files_preserve = self.files_preserve_by_path('/dev/urandom')
+            context.files_preserve = self.files_preserve_by_path(
+                '/dev/urandom')
         else:
             context = FakeContext()
 
@@ -389,17 +260,29 @@ class RepoWatch(object):
 
                 for _, thread in self.threads.items():
                     thread.start()
-                self.main_loop()
+
+                still_running = True
+                while still_running:
+                    try:
+                        sleep(60)
+                    except KeyboardInterrupt:
+                        still_running = False
+                        for i in range(0, self.worker_threads):
+                            self.queue.put({'type': 'shutdown'})
+
         except lockfile.LockTimeout:
             logging.error('Lockfile timeout while attempting to acquire lock, '
                           'are we already running?')
+        except Exception as e:
+            self.logger.error(traceback.format_exception(*sys.exc_info()))
         finally:
             self.logger.info('Shutting down')
             try:
-                self.cleanup_ssh_wrapper(self.wrapper)
+                cleanup_ssh_wrapper(self.wrapper)
             except Exception:
                 self.logger.info('No SSH wrapper to clean?')
             for _, thread in self.threads.items():
                 if thread.is_alive():
+                    self.logger.debug('waiting for {0}'.format(thread))
                     thread.join(2)
             sys.exit(0)

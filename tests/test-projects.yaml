@@ -1,0 +1,10 @@
+---
+- project: kincl/repowatch
+  type: gitlab
+  path: test_repowatch
+  cmds:
+    - echo "%{branch} %{branchdir}"
+    - echo "%{project} %{projectdir}"
+- project: github/orchestrator
+  type: gitlab
+  path: github_orchestrator
