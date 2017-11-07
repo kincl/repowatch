@@ -5,15 +5,13 @@
 import os
 import sys
 import traceback
-
 import logging
 import logging.handlers
-
 import Queue
 import ConfigParser
-
+from multiprocessing import cpu_count
+from time import sleep
 from resource import getrlimit, RLIMIT_NOFILE
-
 from contextlib import contextmanager
 
 import daemon
@@ -23,8 +21,6 @@ try:
 except ImportError:
     from daemon import pidlockfile
 
-from time import sleep
-
 import yaml
 
 from .gitlab import WatchGitlab
@@ -32,7 +28,7 @@ from .gerrit import WatchGerrit
 from .worker import Worker
 from .util import create_ssh_wrapper, cleanup_ssh_wrapper, run_cmd
 
-DEFAULT_THREADS = 2
+DEFAULT_THREADS = cpu_count() * 2
 
 
 @contextmanager
@@ -140,6 +136,7 @@ class RepoWatch(object):
 
                 num_threads = int(_options.get('threads', DEFAULT_THREADS))
                 self.worker_threads += num_threads
+                self.logger.info('Starting {0} worker threads'.format(num_threads))
                 for i in range(0, num_threads):
                     thread_name = '{0}-worker-{1}'.format(repo, i)
                     self.threads[thread_name] = Worker(
