@@ -232,8 +232,7 @@ class RepoWatch(object):
             pidfile = pidlockfile.PIDLockFile(self.pid_file)
             context = daemon.DaemonContext(pidfile=pidfile)
             # because of https://github.com/paramiko/paramiko/issues/59
-            context.files_preserve = self.files_preserve_by_path(
-                '/dev/urandom')
+            context.files_preserve = self.files_preserve_by_path('/dev/urandom')
         else:
             context = FakeContext()
 
