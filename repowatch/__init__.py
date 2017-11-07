@@ -156,7 +156,8 @@ class RepoWatch(object):
                                                             self.options[data['type']]['hostname'],
                                                             self.options[data['type']]['port'],
                                                             project_name),
-                         ssh_key=self.options[data['type']]['key_filename'])
+                         wrapper=self.wrapper,
+                         ssh_key=self.options[data['type']].get('key_filename', None))
         if remote:
             remote_branches = [h.split('\t')[1][11:]
                                for h in remote.rstrip('\n').split('\n')]
@@ -176,8 +177,8 @@ class RepoWatch(object):
 
         for project, data in self.projects.items():
             self.logger.info('Checking that ssh host key is known')
-            known = run_cmd(
-                'ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']))
+            known = run_cmd('ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']),
+                            wrapper=self.wrapper)
             if known is False:
                 self.logger.error('SSH host key not known! Exiting!')
                 raise Exception  # TODO: need more specific Exception here!
@@ -187,6 +188,7 @@ class RepoWatch(object):
                                                                 self.options[data['type']]['hostname'],
                                                                 self.options[data['type']]['port'],
                                                                 project),
+                             wrapper=self.wrapper,
                              ssh_key=self.options[data['type']].get('key_filename', None))
             if remote:
                 for remote_head_str in remote.rstrip('\n').split('\n'):

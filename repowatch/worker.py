@@ -18,7 +18,7 @@ class Worker(threading.Thread):
     def __init__(self, options, queue, ssh_wrapper, projects, ):
         self.options = options
         self.queue = queue
-        self.ssh_wrapper = ssh_wrapper
+        self.wrapper = ssh_wrapper
         self.projects = projects
         self.logger = logging.getLogger('repowatch.worker')
 
@@ -60,11 +60,11 @@ class Worker(threading.Thread):
 
         if os.path.isdir(fullpath):
             if not os.path.isdir(os.path.join(fullpath, '.git')):
-                run_cmd('git init', cwd=fullpath)
+                run_cmd('git init', wrapper=self.wrapper, cwd=fullpath)
         else:
             # create branch dir
             os.makedirs(fullpath)
-            run_cmd('git init', cwd=fullpath)
+            run_cmd('git init', wrapper=self.wrapper, cwd=fullpath)
 
         run_cmd('git fetch '
                 '--depth 1 '
@@ -73,10 +73,11 @@ class Worker(threading.Thread):
                                                    self.options['port'],
                                                    project_name,
                                                    branch_name),
+                wrapper=self.wrapper,
                 ssh_key=self.options.get('key_filename', None),
                 cwd=fullpath)
 
-        run_cmd('git checkout -f FETCH_HEAD ', cwd=fullpath)
+        run_cmd('git checkout -f FETCH_HEAD ', wrapper=self.wrapper, cwd=fullpath)
 
         # run user defined commands
         if cmds:

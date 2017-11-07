@@ -17,16 +17,16 @@ fi
 '''
 
 
-def run_cmd(cmd, ssh_key=None, **kwargs):
+def run_cmd(cmd, wrapper, ssh_key=None, **kwargs):
     ''' Run the command and return stdout '''
     LOG.debug('Running {0}'.format(cmd))
 
-    # Ensure the GIT_SSH wrapper is present
-    # if not os.path.isfile(wrapper):
-    #     create_ssh_wrapper()
-
     env_dict = os.environ.copy()
-    # env_dict['GIT_SSH'] = wrapper
+
+    # Ensure the GIT_SSH wrapper is present
+    if wrapper is not None and os.path.isfile(wrapper):
+        env_dict['GIT_SSH'] = wrapper
+
     if ssh_key:
         env_dict['PKEY'] = ssh_key
 
@@ -67,7 +67,7 @@ def run_user_cmd(cmds, project_name, branch_name, project_dir, branch_dir):
 
     # run commands
     for command in cmds:
-        run_cmd(command, cwd=branch_dir)
+        run_cmd(command, wrapper=None, cwd=branch_dir)
 
 
 def create_ssh_wrapper():
