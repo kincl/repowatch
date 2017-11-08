@@ -51,7 +51,7 @@ class RepoWatch(object):
     Manages the threads that watch for events and acts on events that come in
     '''
 
-    def __init__(self, config_file, project_file, pid_file, syslog, debug):
+    def __init__(self, config_file, project_file, pid_file, syslog, debug, only_once=False):
         self.queue = Queue.Queue()
 
         # read project config to determine what threads we need to start
@@ -59,6 +59,7 @@ class RepoWatch(object):
         self.options = dict()
         self.threads = dict()
         self.wrapper = None
+        self.only_once = only_once
 
         self.worker_threads = 0
 
@@ -229,14 +230,15 @@ class RepoWatch(object):
                 for _, thread in self.threads.items():
                     thread.start()
 
-                still_running = True
-                while still_running:
+                while True:
                     try:
+                        if self.only_once:
+                            raise KeyboardInterrupt
                         sleep(60)
                     except KeyboardInterrupt:
-                        still_running = False
                         for i in range(0, self.worker_threads):
                             self.queue.put({'type': 'shutdown'})
+                        break
 
         except lockfile.LockTimeout:
             logging.error('Lockfile timeout while attempting to acquire lock, '
@@ -251,6 +253,7 @@ class RepoWatch(object):
                 self.logger.info('No SSH wrapper to clean?')
             for _, thread in self.threads.items():
                 if thread.is_alive():
+                    thread.running = False
                     self.logger.debug('waiting for {0}'.format(thread))
-                    thread.join(2)
+                    thread.join(5)
             sys.exit(0)

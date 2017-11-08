@@ -17,6 +17,9 @@ class WatchGerrit(threading.Thread):
         self.options = options
         self.queue = queue
         self.logger = logging.getLogger('repowatch.gerrit')
+
+        self.running = True
+
         threading.Thread.__init__(self)
 
     def get_extra(self, project):
@@ -48,7 +51,7 @@ class WatchGerrit(threading.Thread):
         return extra_refs
 
     def run(self):
-        while 1:
+        while self.running:
 
             try:
                 client = paramiko.SSHClient()

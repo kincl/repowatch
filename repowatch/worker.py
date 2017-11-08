@@ -2,6 +2,7 @@ import os
 import shutil
 import logging
 import threading
+from Queue import Empty
 
 from .util import run_cmd, run_user_cmd
 
@@ -22,18 +23,21 @@ class Worker(threading.Thread):
         self.projects = projects
         self.logger = logging.getLogger('repowatch.worker')
 
+        self.running = True
+
         threading.Thread.__init__(self)
 
     def run(self):
-        still_running = True
         self.logger.debug('Waiting for event')
 
-        while still_running:
+        while self.running:
             try:
                 self._do_handle_one_event()
+            except Empty:
+                pass
             except StopException:
                 self.logger.debug("Stopping")
-                still_running = False
+                self.running = False
 
     def update_branch(self, project_name, branch_name, output_dir=None):
         ''' Do the actual branch update
@@ -125,7 +129,7 @@ class Worker(threading.Thread):
 
     def _do_handle_one_event(self):
         ''' Handles an event off the queue '''
-        event = self.queue.get(True, ONEYEAR)
+        event = self.queue.get(True, 2)
 
         if event['type'] == 'shutdown':
             raise StopException

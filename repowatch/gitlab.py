@@ -62,6 +62,9 @@ class WatchGitlab(threading.Thread):
         self.options = options
         self.queue = queue
         self.logger = logging.getLogger('repowatch.gitlab')
+
+        self.running = True
+
         threading.Thread.__init__(self)
 
     def get_extra(self, _):
@@ -71,9 +74,12 @@ class WatchGitlab(threading.Thread):
     def run(self):
         port = 8000
         httpd = GitlabHTTPServer(('', port), GitlabHTTPHandler, self.queue)
+        httpd.timeout = 2
         self.logger.info('Starting HTTP server on %s', port)
         try:
-            httpd.serve_forever()
+            # httpd.serve_forever()
+            while self.running:
+                httpd.handle_request()
         except Exception as e:
             logging.exception('WatchGitlab: HTTP server exception: %s', str(e))
         finally:
