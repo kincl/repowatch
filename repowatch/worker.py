@@ -94,6 +94,32 @@ class Worker(threading.Thread):
                              fullpath)
             shutil.rmtree(fullpath)
 
+    def cleanup_old_branches(self, project_name):
+        """ delete local branches which don't exist upstream """
+        self.logger.info(
+            'Cleaning up local branches on project {0}'.format(project_name))
+
+        data = self.projects[project_name]
+        remote = run_cmd('git ls-remote --heads '
+                         'ssh://{0}@{1}:{2}/{3}.git'.format(self.options['username'],
+                                                            self.options['hostname'],
+                                                            self.options['port'],
+                                                            project_name),
+                         wrapper=self.wrapper,
+                         ssh_key=self.options.get('key_filename', None))
+        if remote:
+            remote_branches = [h.split('\t')[1][11:]
+                               for h in remote.rstrip('\n').split('\n')]
+            project_path = data['path']
+            local_branches = [name for name in os.listdir(project_path)
+                              if os.path.isdir(os.path.join(project_path, name))]
+            for branch in local_branches:
+                if branch not in (remote_branches):
+                    self.delete_branch(project_name, branch)
+        else:
+            self.logger.warn(
+                'Did not find remote heads for {0}'.format(project_name))
+
     def project_is_valid(self, project_name):
         return True if project_name in self.projects.keys() else False
 
