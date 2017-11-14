@@ -6,7 +6,7 @@ GITROOT=$(git rev-parse --show-toplevel)
 cd ${GITROOT}
 
 COMMIT=$(git rev-parse --short HEAD)
-COMMIT_DATE=$(git log HEAD -n1 --pretty=format:%ai | awk '{gsub(/\-/,"",$1);printf $1}')
+COMMIT_DATE=$(git log HEAD -n1 --pretty=format:%ai | awk '{gsub(/\-/,"",$1);gsub(/\:/,"",$2);printf $1 $2}')
 SHORT_COMMIT=${COMMIT:0:7}
 
 RPMTOPDIR=$GITROOT/rpmbuild
