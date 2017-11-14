@@ -26,7 +26,7 @@ import yaml
 from .gitlab import WatchGitlab
 from .gerrit import WatchGerrit
 from .worker import Worker
-from .util import create_ssh_wrapper, cleanup_ssh_wrapper, run_cmd
+from .util import create_ssh_wrapper, cleanup_ssh_wrapper, run_cmd, get_remote_branches
 
 DEFAULT_THREADS = cpu_count() * 2
 
@@ -166,17 +166,16 @@ class RepoWatch(object):
                              wrapper=self.wrapper,
                              ssh_key=self.options[data['type']].get('key_filename', None))
             if remote:
-                for remote_head_str in remote.rstrip('\n').split('\n'):
-                    try:
-                        branch = remote_head_str.split('\t')[1][11:]
-                        self.logger.debug(
-                            'Adding project branch to queue: {0}:{1}'.format(project, branch))
-                        self.queue.put({'type': 'update',
-                                        'project_name': project,
-                                        'branch_name': branch})
-                    except IndexError:
-                        self.logger.debug(
-                            'Bad remote head: %s', remote_head_str)
+                for branch in get_remote_branches(remote):
+                    self.logger.debug(
+                        'Adding project branch to queue: {0}:{1}'.format(project, branch))
+                    self.queue.put({'type': 'update',
+                                    'project_name': project,
+                                    'branch_name': branch})
+
+                # also delete those pesky old branches
+                self.queue.put({'type': 'delete',
+                                'project_name': project})
                 # check out extra branches like issues or changesets TODO
                 # for ref, outdir in self.threads[data['type']].get_extra(project):
                 #     self.update_branch(project, ref, outdir)

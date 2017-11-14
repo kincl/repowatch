@@ -4,7 +4,7 @@ import logging
 import threading
 from Queue import Empty
 
-from .util import run_cmd, run_user_cmd
+from .util import run_cmd, run_user_cmd, get_remote_branches
 
 ONEYEAR = 365*24*60*60
 
@@ -112,9 +112,8 @@ class Worker(threading.Thread):
                          wrapper=self.wrapper,
                          ssh_key=self.options.get('key_filename', None))
         if remote:
-            remote_branches = [h.split('\t')[1][11:]
-                               for h in remote.rstrip('\n').split('\n')]
             project_path = data['path']
+            remote_branches = get_remote_branches(remote)
             local_branches = [name for name in os.listdir(project_path)
                               if os.path.isdir(os.path.join(project_path, name))]
             for branch in local_branches:

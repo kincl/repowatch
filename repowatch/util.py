@@ -17,6 +17,17 @@ fi
 '''
 
 
+def get_remote_branches(output):
+    branches = []
+    for remote_head_str in output.rstrip('\n').split('\n'):
+        try:
+            branch = remote_head_str.split('\t')[1][11:]
+            branches.append(branch)
+        except IndexError:
+            LOG.debug('Bad remote head: %s', remote_head_str)
+    return branches
+
+
 def run_cmd(cmd, wrapper, ssh_key=None, **kwargs):
     ''' Run the command and return stdout '''
     LOG.debug('Running {0}'.format(cmd))
