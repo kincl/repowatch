@@ -16,11 +16,12 @@ class StopException(Exception):
 class Worker(threading.Thread):
     """ Waits for queue events and does the checkout and management """
 
-    def __init__(self, options, queue, ssh_wrapper, projects, ):
+    def __init__(self, options, queue, ssh_wrapper, projects, lock):
         self.options = options
         self.queue = queue
         self.wrapper = ssh_wrapper
         self.projects = projects
+        self.lock = lock
         self.logger = logging.getLogger('repowatch.worker')
 
         self.running = True
@@ -85,9 +86,10 @@ class Worker(threading.Thread):
 
         # run user defined commands
         if cmds:
-            project_dir = self.projects[project_name]['path']
-            branch_dir = os.path.join(project_dir, branch_name)
-            run_user_cmd(cmds, project_name, branch_name, project_dir, branch_dir)
+            with self.lock:
+                project_dir = self.projects[project_name]['path']
+                branch_dir = os.path.join(project_dir, branch_name)
+                run_user_cmd(cmds, project_name, branch_name, project_dir, branch_dir)
 
     def delete_branch(self, project_name, branch_name):
         fullpath = '{0}/{1}'.format(self.projects[project_name]['path'], branch_name)

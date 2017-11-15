@@ -8,6 +8,7 @@ import traceback
 import logging
 import logging.handlers
 import Queue
+from threading import Lock
 import ConfigParser
 from multiprocessing import cpu_count
 from time import sleep
@@ -44,6 +45,17 @@ def get_class(classname):
     Gets a class that is in the global scope by looking up the name
     '''
     return globals()[classname]
+
+
+class NoLock(object):
+    '''
+    This sets up a object that looks like a lock but doesn't act like one
+    '''
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        pass
 
 
 class RepoWatch(object):
@@ -135,13 +147,18 @@ class RepoWatch(object):
                     self.logger.info('Error instantiating watcher: %s', e)
                 self.threads[repo].daemon = True
 
+                if _options.get('sequential_project_commands', False):
+                    lock = Lock()
+                else:
+                    lock = NoLock()
+
                 num_threads = int(_options.get('threads', DEFAULT_THREADS))
                 self.worker_threads += num_threads
                 self.logger.info('Starting {0} worker threads'.format(num_threads))
                 for i in range(0, num_threads):
                     thread_name = '{0}-worker-{1}'.format(repo, i)
                     self.threads[thread_name] = Worker(
-                        _options, self.queue, self.wrapper, self.projects)
+                        _options, self.queue, self.wrapper, self.projects, lock)
                     self.threads[thread_name].daemon = True
 
         self.logger.info('Finished config')
