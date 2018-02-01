@@ -29,7 +29,8 @@ from .gerrit import WatchGerrit
 from .worker import Worker
 from .util import create_ssh_wrapper, cleanup_ssh_wrapper, run_cmd, get_remote_branches
 
-DEFAULT_THREADS = cpu_count() * 2
+# be careful not to exceed the ssh MaxStartups threshold (default 10)
+DEFAULT_THREADS = cpu_count() * 2 if (cpu_count() * 2) < 10 else 10
 
 
 @contextmanager
