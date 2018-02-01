@@ -169,8 +169,18 @@ class RepoWatch(object):
 
         for project, data in self.projects.items():
             self.logger.info('Checking that ssh host key is known')
-            known = run_cmd('ssh-keygen -F {0}'.format(self.options[data['type']]['hostname']),
-                            wrapper=self.wrapper)
+            hostname = self.options[data['type']]['hostname']
+
+            known_host_files = [
+                os.path.join(os.path.expanduser('~'), '.ssh/known_hosts'),
+                '/etc/ssh/ssh_known_hosts']
+
+            for known_host_file in known_host_files:
+                known = run_cmd('ssh-keygen -F {0} -f {1}'.format(hostname, known_host_file),
+                                wrapper=self.wrapper)
+                if known:
+                    break
+
             if known is False:
                 self.logger.error('SSH host key not known! Exiting!')
                 raise Exception  # TODO: need more specific Exception here!
