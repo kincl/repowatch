@@ -174,7 +174,8 @@ class RepoWatch(object):
 
             known_host_files = [
                 os.path.join(os.path.expanduser('~'), '.ssh/known_hosts'),
-                '/etc/ssh/ssh_known_hosts']
+                '/etc/ssh/ssh_known_hosts',
+                '/etc/ssh/ssh_known_hosts2']
 
             for known_host_file in known_host_files:
                 known = run_cmd('ssh-keygen -F {0} -f {1}'.format(hostname, known_host_file),
